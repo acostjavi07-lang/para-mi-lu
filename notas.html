@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Notas — Isaías & Lu</title>
+<style>
+  :root{
+    --bg:#0a0307; --ink:#f6ece6; --ink-dim:#cdb8b2;
+    --isa-accent:#ff8a6a; --isa-glow:#b8232f;
+    --lu-accent:#ff6f9c; --lu-glow:#a01a4a;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:var(--bg);
+    font-family:'Segoe UI',system-ui,-apple-system,Arial,sans-serif; color:var(--ink);}
+
+  #wrap{position:fixed; inset:0; display:flex; flex-direction:row;}
+  @media (max-width:720px){ #wrap{flex-direction:column;} }
+
+  .panel{flex:1; display:flex; flex-direction:column; position:relative; min-height:0;}
+  .panelIsa{background:linear-gradient(160deg,#2a0a0d,#150507);}
+  .panelLu{background:linear-gradient(200deg,#2a0a18,#15050c);}
+
+  .panelHeader{padding:20px 20px 12px 20px; display:flex; align-items:center; justify-content:space-between;
+    flex-shrink:0;}
+  .panelTitle{font-size:1.1rem; font-weight:800; letter-spacing:2px;}
+  .panelIsa .panelTitle{color:var(--isa-accent);}
+  .panelLu .panelTitle{color:var(--lu-accent);}
+  .statusTag{font-size:0.68rem; color:var(--ink-dim); letter-spacing:1px; opacity:0; transition:opacity .3s ease;}
+  .statusTag.show{opacity:0.85;}
+
+  textarea{flex:1; width:100%; resize:none; border:none; outline:none; background:transparent; color:var(--ink);
+    font-family:inherit; font-size:1.02rem; line-height:1.6; padding:0 20px 20px 20px; min-height:0;}
+  textarea::placeholder{color:rgba(255,255,255,0.25);}
+
+  .divider{width:1px; background:rgba(255,255,255,0.08); flex-shrink:0;}
+  @media (max-width:720px){ .divider{width:100%; height:1px;} }
+
+  #homeLink{position:fixed; top:16px; left:16px; z-index:50; width:38px; height:38px; border-radius:50%;
+    background:rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.15); color:var(--ink);
+    display:flex; align-items:center; justify-content:center; font-size:1rem; text-decoration:none;}
+
+  #offlineNotice{position:fixed; inset:0; z-index:60; background:rgba(5,2,3,0.94); display:none;
+    align-items:center; justify-content:center; text-align:center; padding:30px;}
+  #offlineNotice.show{display:flex;}
+  #offlineNotice p{max-width:340px; font-size:0.95rem; line-height:1.6; color:var(--ink-dim);}
+</style>
+</head>
+<body>
+
+<a href="index.html" id="homeLink">🏠</a>
+
+<div id="wrap">
+  <div class="panel panelIsa">
+    <div class="panelHeader">
+      <div class="panelTitle">Isaías</div>
+      <div class="statusTag" id="statusIsa"></div>
+    </div>
+    <textarea id="textIsa" placeholder="escribile algo a Lu..."></textarea>
+  </div>
+  <div class="divider"></div>
+  <div class="panel panelLu">
+    <div class="panelHeader">
+      <div class="panelTitle">Lu❤</div>
+      <div class="statusTag" id="statusLu"></div>
+    </div>
+    <textarea id="textLu" placeholder="escribile algo a Isaías..."></textarea>
+  </div>
+</div>
+
+<div id="offlineNotice">
+  <p>No se pudo conectar. Esta página necesita internet para que los mensajes se guarden y se compartan entre los dos. Revisá tu conexión y recargá.</p>
+</div>
+
+<!-- Firebase (SDK gratuito de Google, versión "compat" para que funcione con script simple) -->
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
+
+<script>
+(function(){
+"use strict";
+
+/* ============================================================
+   PEGÁ ACÁ TU CONFIGURACIÓN DE FIREBASE
+   La sacás de: Firebase Console → ⚙️ Configuración del proyecto
+   → Tus apps → app web → "Config"
+   Reemplazá TODO este objeto por el que te da Firebase.
+   ============================================================ */
+const firebaseConfig = {
+  apiKey: "AIzaSyBMipVWd7Ms7AB1FTvOv3eAI-gFv3vQ83s",
+  authDomain: "para-lu-notas.firebaseapp.com",
+  databaseURL: "https://para-lu-notas-default-rtdb.firebaseio.com",
+  projectId: "para-lu-notas",
+  storageBucket: "para-lu-notas.firebasestorage.app",
+  messagingSenderId: "203773545551",
+  appId: "1:203773545551:web:59d775eda5f06d3c00ae3a"
+};
+
+let db = null;
+try{
+  firebase.initializeApp(firebaseConfig);
+  db = firebase.database();
+}catch(e){
+  document.getElementById("offlineNotice").classList.add("show");
+}
+
+function setupPanel(path, textareaId, statusId){
+  const textarea = document.getElementById(textareaId);
+  const status = document.getElementById(statusId);
+  if(!db){ textarea.disabled = true; return; }
+
+  const ref = db.ref(path);
+  let debounceTimer = null;
+  let connectedOnce = false;
+
+  ref.on("value", (snap)=>{
+    connectedOnce = true;
+    const val = snap.val();
+    if(document.activeElement !== textarea){
+      textarea.value = (val === null || val === undefined) ? "" : val;
+    }
+  }, (err)=>{
+    status.textContent = "sin conexión";
+    status.classList.add("show");
+  });
+
+  textarea.addEventListener("input", ()=>{
+    status.textContent = "escribiendo…";
+    status.classList.add("show");
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(()=>{
+      ref.set(textarea.value)
+        .then(()=>{
+          status.textContent = "guardado ✓";
+          setTimeout(()=>{ status.classList.remove("show"); }, 1400);
+        })
+        .catch(()=>{
+          status.textContent = "no se pudo guardar, revisá tu conexión";
+        });
+    }, 600);
+  });
+
+  setTimeout(()=>{
+    if(!connectedOnce){
+      document.getElementById("offlineNotice").classList.add("show");
+    }
+  }, 6000);
+}
+
+if(db){
+  setupPanel("notas/isaias", "textIsa", "statusIsa");
+  setupPanel("notas/lu", "textLu", "statusLu");
+}
+
+})();
+</script>
+</body>
+</html>
