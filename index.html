@@ -57,6 +57,18 @@
   .footerNote .line{width:38px;height:2px;background:rgba(255,255,255,0.15);margin:0 auto 14px auto;border-radius:2px;}
   .footerNote .txt{font-size:0.7rem; color:rgba(255,255,255,0.3); letter-spacing:1px;}
 
+  #letterToggleBtn{margin-top:18px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.12);
+    color:var(--ink-dim); font-size:0.72rem; letter-spacing:0.5px; padding:9px 16px; border-radius:20px;
+    cursor:pointer; opacity:0.75; transition:opacity .2s ease, background .2s ease;}
+  #letterToggleBtn:hover, #letterToggleBtn:active{opacity:1; background:rgba(255,255,255,0.08);}
+
+  #letterCard{max-width:380px; width:92vw; margin:16px auto 0 auto; background:linear-gradient(180deg,#fff8f0,#f3e2d3);
+    color:#3a1f1a; border-radius:14px; padding:22px 20px; box-shadow:0 16px 40px rgba(0,0,0,0.45);
+    font-family:Georgia,'Times New Roman',serif; font-size:0.95rem; line-height:1.65; white-space:pre-wrap;
+    text-align:left; display:none; animation:letterOpen .35s ease both;}
+  #letterCard.show{display:block;}
+  @keyframes letterOpen{from{opacity:0; transform:translateY(-6px) scale(0.98);} to{opacity:1; transform:translateY(0) scale(1);}}
+
   #detailSheet{position:fixed; inset:0; z-index:5; display:flex; align-items:flex-end; justify-content:center;
     background:rgba(0,0,0,0); pointer-events:none; transition:background .25s ease;}
   #detailSheet.open{background:rgba(0,0,0,0.55); pointer-events:auto;}
@@ -100,6 +112,11 @@
       <div class="tileLabel">Top 5</div>
     </div>
 
+    <div class="appTile" data-title="Notas" data-desc="Un bloc de notas compartido: cada uno escribe de su lado y el otro lo ve al instante." data-href="notas.html" data-icon="📝" data-locked="0">
+      <div class="iconBox glowPulse">📝</div>
+      <div class="tileLabel">Notas</div>
+    </div>
+
     <div class="appTile" data-title="Próximamente" data-desc="Todavía no existe... pero en algún momento va a aparecer algo nuevo acá." data-href="" data-icon="✦" data-locked="1">
       <div class="iconBox locked">
         <span class="badge">?</span>
@@ -112,6 +129,8 @@
   <div class="footerNote">
     <div class="line"></div>
     <div class="txt">hecho con cariño — Isa</div>
+    <button id="letterToggleBtn">abrime para saber qué es esto</button>
+    <div id="letterCard"></div>
   </div>
 </div>
 
@@ -136,6 +155,16 @@ let greet = "Buenas noches";
 if(hour>=6 && hour<12) greet = "Buen día";
 else if(hour>=12 && hour<20) greet = "Buenas tardes";
 document.getElementById("greeting").textContent = greet + ", Lu";
+
+/* carta chiquita al pie de la página */
+const LETTER_TEXT = "hola amorrr, hice esta página solo para nosotros, en ella voy a ir subiendo todas las cosas que yo te haga para que nunca se pierdan y se guarden, tranqui, cada vez que agregue algo vos solo tenés que entrar al link, te amo mucho mi amor, espero disfrutes este detallito";
+const letterCard = document.getElementById("letterCard");
+const letterToggleBtn = document.getElementById("letterToggleBtn");
+letterCard.textContent = LETTER_TEXT;
+letterToggleBtn.addEventListener("click", ()=>{
+  const abierta = letterCard.classList.toggle("show");
+  letterToggleBtn.textContent = abierta ? "cerrar" : "abrime para saber qué es esto";
+});
 
 /* fondo con partículas cálidas, sutil, tipo brasas */
 const canvas = document.getElementById("canvasBg");
