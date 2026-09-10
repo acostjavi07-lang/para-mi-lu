@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Para Lu</title>
+<style>
+  :root{
+    --bg1:#0a0307; --bg2:#28080d; --accent:#ff8a6a; --glow:#ff4d5e; --ink:#f6ece6; --ink-dim:#cdb8b2;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none;}
+  html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;
+    background:#050203; font-family:'Segoe UI',system-ui,-apple-system,Arial,sans-serif; color:var(--ink);}
+  #canvasBg{position:fixed;inset:0;z-index:0;}
+  #app{position:fixed;inset:0;z-index:1;display:flex;flex-direction:column;align-items:center;
+    padding:env(safe-area-inset-top,0) 20px calc(env(safe-area-inset-bottom,0) + 20px) 20px;
+    overflow-y:auto;}
+
+  .topBar{width:100%; max-width:520px; padding-top:34px; text-align:center; flex-shrink:0;}
+  .doorIcon{width:44px;height:68px;border-radius:6px 6px 0 0; margin:0 auto 14px auto;
+    background:linear-gradient(180deg, var(--glow), #7a0e16);
+    box-shadow:0 0 26px 6px rgba(255,60,70,0.4); position:relative;
+    animation:doorGlow 2.8s ease-in-out infinite;}
+  .doorIcon::after{content:'';position:absolute;right:6px;top:50%;width:4px;height:4px;border-radius:50%;
+    background:#ffe3b0;transform:translateY(-50%);}
+  @keyframes doorGlow{0%,100%{filter:brightness(1);}50%{filter:brightness(1.3);}}
+
+  .greeting{font-size:0.82rem; letter-spacing:2px; color:var(--ink-dim); text-transform:uppercase; margin-bottom:2px;}
+  h1{font-size:clamp(1.7rem,7vw,2.4rem); letter-spacing:5px; margin:0 0 6px 0; font-weight:800;
+    text-shadow:0 0 22px rgba(255,80,90,0.5);}
+  .subtitle{color:var(--ink-dim); font-size:0.85rem; margin-bottom:6px; font-style:italic;}
+
+  .grid{width:100%; max-width:520px; display:grid; grid-template-columns:repeat(3,1fr); gap:22px 14px;
+    margin-top:30px; flex:1;}
+  @media (min-width:600px){ .grid{grid-template-columns:repeat(4,1fr);} }
+
+  .appTile{display:flex; flex-direction:column; align-items:center; gap:8px; text-decoration:none; color:var(--ink);
+    cursor:pointer; -webkit-touch-callout:none;}
+  .iconBox{width:100%; aspect-ratio:1/1; max-width:84px; border-radius:22%; display:flex; align-items:center;
+    justify-content:center; font-size:2rem; position:relative; overflow:hidden;
+    background:linear-gradient(155deg, #ff8a6a, #b8232f);
+    box-shadow:0 10px 20px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.35);
+    transition:transform .15s ease, box-shadow .15s ease;}
+  .appTile:active .iconBox{transform:scale(0.9);}
+  .iconBox::before{content:''; position:absolute; inset:0; background:linear-gradient(155deg, rgba(255,255,255,0.25), rgba(255,255,255,0) 55%);}
+  .iconBox.locked{background:linear-gradient(155deg, #3a2a2c, #241618); filter:grayscale(0.4);}
+  .iconBox .badge{position:absolute; top:-4px; right:-4px; background:var(--glow); color:#fff; font-size:0.62rem;
+    font-weight:800; padding:2px 6px; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.5);}
+  .tileLabel{font-size:0.74rem; text-align:center; line-height:1.25; color:var(--ink); max-width:88px;}
+  .tileLabel.dim{color:var(--ink-dim);}
+
+  .glowPulse{animation:iconPulse 2.6s ease-in-out infinite;}
+  @keyframes iconPulse{0%,100%{box-shadow:0 10px 20px rgba(0,0,0,0.5), 0 0 0 rgba(255,90,90,0);}
+    50%{box-shadow:0 10px 26px rgba(0,0,0,0.5), 0 0 22px rgba(255,90,90,0.55);}}
+
+  .footerNote{margin-top:auto; padding-top:34px; text-align:center; flex-shrink:0;}
+  .footerNote .line{width:38px;height:2px;background:rgba(255,255,255,0.15);margin:0 auto 14px auto;border-radius:2px;}
+  .footerNote .txt{font-size:0.7rem; color:rgba(255,255,255,0.3); letter-spacing:1px;}
+
+  #detailSheet{position:fixed; inset:0; z-index:5; display:flex; align-items:flex-end; justify-content:center;
+    background:rgba(0,0,0,0); pointer-events:none; transition:background .25s ease;}
+  #detailSheet.open{background:rgba(0,0,0,0.55); pointer-events:auto;}
+  .sheetCard{width:100%; max-width:520px; background:linear-gradient(180deg,#1c0a0d,#0c0405);
+    border-radius:24px 24px 0 0; padding:26px 24px calc(env(safe-area-inset-bottom,0) + 26px) 24px;
+    transform:translateY(100%); transition:transform .3s cubic-bezier(.2,.9,.3,1);
+    border-top:1px solid rgba(255,150,120,0.25); box-shadow:0 -20px 50px rgba(0,0,0,0.5);}
+  #detailSheet.open .sheetCard{transform:translateY(0);}
+  .sheetHandle{width:36px;height:4px;background:rgba(255,255,255,0.2);border-radius:4px;margin:0 auto 18px auto;}
+  .sheetIcon{width:64px;height:64px;border-radius:22%;display:flex;align-items:center;justify-content:center;
+    font-size:1.8rem;background:linear-gradient(155deg, #ff8a6a, #b8232f); margin-bottom:14px;
+    box-shadow:0 8px 18px rgba(0,0,0,0.4);}
+  .sheetTitle{font-size:1.2rem; font-weight:700; margin-bottom:6px;}
+  .sheetDesc{font-size:0.88rem; color:var(--ink-dim); line-height:1.5; margin-bottom:22px;}
+  .sheetBtn{display:block; width:100%; text-align:center; padding:15px; border-radius:14px; border:none;
+    background:linear-gradient(180deg,#ff8a6a,#b8232f); color:#fff; font-weight:700; letter-spacing:1px;
+    font-size:1rem; text-decoration:none; box-shadow:0 10px 24px rgba(180,30,40,0.4);}
+  .sheetClose{display:block; width:100%; text-align:center; padding:13px; margin-top:10px; border-radius:14px;
+    border:1px solid rgba(255,255,255,0.15); background:transparent; color:var(--ink-dim); font-size:0.9rem;}
+</style>
+</head>
+<body>
+<canvas id="canvasBg"></canvas>
+
+<div id="app">
+  <div class="topBar">
+    <div class="doorIcon"></div>
+    <div class="greeting" id="greeting">Hola</div>
+    <h1>PARA LU</h1>
+    <div class="subtitle">tocá cualquiera para entrar</div>
+  </div>
+
+  <div class="grid">
+    <div class="appTile" data-title="LUCILA" data-desc="Un pequeño juego que hice pensando en vos. Tiene capítulos, secretos y alguna que otra boludez escondida." data-href="juego.html" data-icon="🚪" data-locked="0">
+      <div class="iconBox glowPulse">🚪</div>
+      <div class="tileLabel">LUCILA</div>
+    </div>
+
+    <div class="appTile" data-title="Top 5" data-desc="Una presentación muy seria e importante sobre un ranking muy objetivo." data-href="top5.html" data-icon="❤" data-locked="0">
+      <div class="iconBox glowPulse">❤</div>
+      <div class="tileLabel">Top 5</div>
+    </div>
+
+    <div class="appTile" data-title="Próximamente" data-desc="Todavía no existe... pero en algún momento va a aparecer algo nuevo acá." data-href="" data-icon="✦" data-locked="1">
+      <div class="iconBox locked">
+        <span class="badge">?</span>
+        ✦
+      </div>
+      <div class="tileLabel dim">Próximamente</div>
+    </div>
+  </div>
+
+  <div class="footerNote">
+    <div class="line"></div>
+    <div class="txt">hecho con cariño — Isa</div>
+  </div>
+</div>
+
+<div id="detailSheet">
+  <div class="sheetCard">
+    <div class="sheetHandle"></div>
+    <div class="sheetIcon" id="sheetIcon">🚪</div>
+    <div class="sheetTitle" id="sheetTitle">LUCILA</div>
+    <div class="sheetDesc" id="sheetDesc">...</div>
+    <a class="sheetBtn" id="sheetBtn" href="#">Entrar</a>
+    <button class="sheetClose" id="sheetClose">Cerrar</button>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* saludo según la hora */
+const hour = new Date().getHours();
+let greet = "Buenas noches";
+if(hour>=6 && hour<12) greet = "Buen día";
+else if(hour>=12 && hour<20) greet = "Buenas tardes";
+document.getElementById("greeting").textContent = greet + ", Lu";
+
+/* fondo con partículas cálidas, sutil, tipo brasas */
+const canvas = document.getElementById("canvasBg");
+const ctx = canvas.getContext("2d");
+let W=window.innerWidth, H=window.innerHeight;
+function resize(){ W=window.innerWidth; H=window.innerHeight; canvas.width=W; canvas.height=H; }
+window.addEventListener("resize", resize);
+resize();
+
+const particles = [];
+const COUNT = Math.min(50, Math.floor(W*H/16000));
+for(let i=0;i<COUNT;i++){
+  particles.push({
+    x: Math.random()*W, y: Math.random()*H, r: 0.6+Math.random()*1.8,
+    vy: -4-Math.random()*8, vx: -2+Math.random()*4, phase: Math.random()*Math.PI*2
+  });
+}
+function loop(){
+  ctx.fillStyle = "rgba(5,2,3,1)";
+  ctx.fillRect(0,0,W,H);
+  const g = ctx.createRadialGradient(W*0.5,H*0.15,10, W*0.5,H*0.15, Math.max(W,H)*0.8);
+  g.addColorStop(0,"rgba(120,20,25,0.35)");
+  g.addColorStop(1,"rgba(0,0,0,0)");
+  ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+
+  ctx.fillStyle = "rgba(255,150,110,0.45)";
+  for(const p of particles){
+    p.phase += 0.02;
+    p.x += (p.vx*0.02) + Math.sin(p.phase)*0.3;
+    p.y += p.vy*0.02;
+    if(p.y < -10){ p.y = H+10; p.x = Math.random()*W; }
+    if(p.x < -10) p.x = W+10;
+    if(p.x > W+10) p.x = -10;
+    ctx.beginPath();
+    ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+    ctx.fill();
+  }
+  requestAnimationFrame(loop);
+}
+loop();
+
+/* bottom sheet al tocar un icono */
+const sheet = document.getElementById("detailSheet");
+const sheetIcon = document.getElementById("sheetIcon");
+const sheetTitle = document.getElementById("sheetTitle");
+const sheetDesc = document.getElementById("sheetDesc");
+const sheetBtn = document.getElementById("sheetBtn");
+
+document.querySelectorAll(".appTile").forEach(tile=>{
+  tile.addEventListener("click",(e)=>{
+    e.preventDefault();
+    const locked = tile.getAttribute("data-locked")==="1";
+    sheetIcon.textContent = tile.getAttribute("data-icon");
+    sheetTitle.textContent = tile.getAttribute("data-title");
+    sheetDesc.textContent = tile.getAttribute("data-desc");
+    if(locked){
+      sheetBtn.style.display = "none";
+    } else {
+      sheetBtn.style.display = "block";
+      sheetBtn.href = tile.getAttribute("data-href");
+    }
+    sheet.classList.add("open");
+  });
+});
+document.getElementById("sheetClose").addEventListener("click", ()=> sheet.classList.remove("open"));
+sheet.addEventListener("click",(e)=>{ if(e.target===sheet) sheet.classList.remove("open"); });
+
+})();
+</script>
+</body>
+</html>
