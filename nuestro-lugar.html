@@ -27,7 +27,7 @@
     letter-spacing:1px; cursor:pointer; color:#fff;}
   #btnIsa{background:linear-gradient(180deg,var(--isa-accent),var(--isa-glow));}
   #btnLu{background:linear-gradient(180deg,var(--lu-accent),var(--lu-glow));}
-  #hidden .hidden{display:none !important;}
+  .hidden{display:none !important;}
 
   /* ---- HUD ---- */
   #hud{position:fixed; inset:0; z-index:20; pointer-events:none;}
@@ -94,6 +94,8 @@
     color:var(--ink); padding:10px 16px; font-size:0.95rem; outline:none;}
   #chatSendBtn{width:44px; height:44px; border-radius:50%; border:none;
     background:linear-gradient(180deg,#ff8a6a,#b8232f); color:#fff; font-size:1.1rem;}
+
+  #chatInput, textarea{ user-select:text; -webkit-user-select:text; touch-action:manipulation; }
 </style>
 </head>
 <body>
@@ -162,10 +164,39 @@ const firebaseConfig = {
 };
 
 let db = null;
-try{
-  firebase.initializeApp(firebaseConfig);
-  db = firebase.database();
-}catch(e){ db = null; }
+let dbInitError = null;
+
+function tryInitFirebase(){
+  try{
+    if(typeof firebase === "undefined"){
+      dbInitError = "No se pudieron cargar los scripts de Firebase (revisá tu conexión a internet).";
+      return false;
+    }
+    if(!firebase.apps || firebase.apps.length === 0){
+      firebase.initializeApp(firebaseConfig);
+    }
+    db = firebase.database();
+    dbInitError = null;
+    return true;
+  }catch(e){
+    db = null;
+    dbInitError = e.message || "Error desconocido al conectar con Firebase.";
+    return false;
+  }
+}
+
+tryInitFirebase();
+if(!db){
+  // reintenta un par de veces por si los scripts todavía estaban cargando
+  let retries = 0;
+  const retryTimer = setInterval(()=>{
+    retries++;
+    if(tryInitFirebase() || retries>=5){
+      clearInterval(retryTimer);
+    }
+  }, 700);
+}
+window.addEventListener("online", ()=>{ if(!db) tryInitFirebase(); });
 
 const NAMES = { isaias:"Isaías", lu:"Lu❤" };
 const COLORS = {
@@ -326,7 +357,11 @@ requestAnimationFrame(loop);
    MOVIMIENTO
    ============================================================ */
 const keys = new Set();
-window.addEventListener("keydown", e=> keys.add(e.key.toLowerCase()));
+window.addEventListener("keydown", e=>{
+  const activeTag = document.activeElement && document.activeElement.tagName;
+  if(activeTag === "INPUT" || activeTag === "TEXTAREA") return;
+  keys.add(e.key.toLowerCase());
+});
 window.addEventListener("keyup", e=> keys.delete(e.key.toLowerCase()));
 
 const joyBase = document.getElementById("joystickBase");
@@ -383,7 +418,27 @@ function handleMovement(dt){
    SINCRONIZAR POSICIÓN DEL OTRO JUGADOR
    ============================================================ */
 function startRoom(){
-  if(!db) return;
+  if(!db){
+    // Firebase todavía no cargó: reintenta hasta que esté listo
+    let waited = 0;
+    const waitTimer = setInterval(()=>{
+      waited += 400;
+      if(!db) tryInitFirebase();
+      if(db){
+        clearInterval(waitTimer);
+        attachRoomListeners();
+      } else if(waited >= 6000){
+        clearInterval(waitTimer);
+        chatStatus.textContent = dbInitError || "No se pudo conectar. Recargá la página.";
+        chatStatus.style.display = "block";
+      }
+    }, 400);
+    return;
+  }
+  attachRoomListeners();
+}
+
+function attachRoomListeners(){
   db.ref("room/players/"+otherId).on("value",(snap)=>{
     const v = snap.val();
     if(v && typeof v.x==="number" && typeof v.y==="number"){
@@ -463,13 +518,36 @@ function appendChatLog(msg){
   chatLog.scrollTop = chatLog.scrollHeight;
 }
 
+const chatSendBtn = document.getElementById("chatSendBtn");
+const chatStatus = document.createElement("div");
+chatStatus.style.cssText = "font-size:0.72rem; color:#ff9a8a; text-align:center; padding:0 14px; display:none;";
+document.querySelector(".chatInputRow").insertAdjacentElement("beforebegin", chatStatus);
+
 function sendChat(){
   const text = chatInput.value.trim();
-  if(!text || !db || !myId) return;
-  db.ref("room/chat").push({ from: myId, text: text, ts: Date.now() });
-  chatInput.value = "";
+  if(!text) return;
+  if(!db){
+    tryInitFirebase();
+  }
+  if(!db || !myId){
+    chatStatus.textContent = dbInitError || "No hay conexión con la base de datos. Revisá tu internet y recargá.";
+    chatStatus.style.display = "block";
+    return;
+  }
+  chatSendBtn.disabled = true;
+  db.ref("room/chat").push({ from: myId, text: text, ts: Date.now() })
+    .then(()=>{
+      chatInput.value = "";
+      chatStatus.style.display = "none";
+      chatSendBtn.disabled = false;
+    })
+    .catch((err)=>{
+      chatSendBtn.disabled = false;
+      chatStatus.textContent = "No se pudo enviar (" + err.message + "). Revisá las reglas de Firebase.";
+      chatStatus.style.display = "block";
+    });
 }
-document.getElementById("chatSendBtn").addEventListener("click", sendChat);
+chatSendBtn.addEventListener("click", sendChat);
 chatInput.addEventListener("keydown",(e)=>{ if(e.key==="Enter") sendChat(); });
 
 /* ============================================================
