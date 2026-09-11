@@ -112,11 +112,12 @@ function setupPanel(path, textareaId, statusId){
   const ref = db.ref(path);
   let debounceTimer = null;
   let connectedOnce = false;
+  let editingUntil = 0;
 
   ref.on("value", (snap)=>{
     connectedOnce = true;
     const val = snap.val();
-    if(document.activeElement !== textarea){
+    if(Date.now() > editingUntil){
       textarea.value = (val === null || val === undefined) ? "" : val;
     }
   }, (err)=>{
@@ -125,6 +126,7 @@ function setupPanel(path, textareaId, statusId){
   });
 
   textarea.addEventListener("input", ()=>{
+    editingUntil = Date.now() + 1500;
     status.textContent = "escribiendo…";
     status.classList.add("show");
     clearTimeout(debounceTimer);
