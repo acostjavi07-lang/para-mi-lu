@@ -96,6 +96,45 @@
     background:linear-gradient(180deg,#ff8a6a,#b8232f); color:#fff; font-size:1.1rem;}
 
   #chatInput, textarea{ user-select:text; -webkit-user-select:text; touch-action:manipulation; }
+
+  /* ---- responder mensajes ---- */
+  .chatMsg{position:relative; cursor:pointer;}
+  .chatMsg .replyQuote{display:block; border-left:3px solid rgba(255,255,255,0.45); padding-left:8px;
+    margin-bottom:5px; font-size:0.78rem; opacity:0.75; line-height:1.25; word-break:break-word;}
+  .chatMsg.mine .replyQuote{border-left-color:rgba(255,255,255,0.7);}
+  #replyBar{display:none; align-items:center; gap:10px; padding:8px 14px; background:rgba(255,255,255,0.06);
+    border-top:1px solid rgba(255,255,255,0.08); font-size:0.8rem;}
+  #replyBar.show{display:flex;}
+  #replyBar .info{flex:1; min-width:0;}
+  #replyBar .who{color:#ffb9a8; font-weight:700; font-size:0.72rem;}
+  #replyBar .txt{opacity:0.75; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  #replyCancelBtn{background:none; border:none; color:#cdb8b2; font-size:1.1rem; padding:0 4px;}
+
+  /* ---- reproductor de YouTube ---- */
+  #ytBtn{position:fixed; right:20px; bottom:200px; width:48px; height:48px; border-radius:50%;
+    background:rgba(0,0,0,0.45); border:1px solid rgba(255,255,255,0.18); color:#fff; font-size:1.1rem;
+    display:flex; align-items:center; justify-content:center; pointer-events:auto; z-index:21;}
+  #ytPanel{position:fixed; inset:0; z-index:45; display:flex; align-items:center; justify-content:center;
+    background:rgba(0,0,0,0); pointer-events:none; transition:background .25s ease;}
+  #ytPanel.open{background:rgba(0,0,0,0.65); pointer-events:auto;}
+  .ytCard{width:min(520px,92vw); background:linear-gradient(180deg,#1c0a0d,#0c0405); border-radius:18px;
+    padding:18px; border:1px solid rgba(255,150,120,0.25); transform:scale(0.92); opacity:0;
+    transition:transform .25s ease, opacity .25s ease;}
+  #ytPanel.open .ytCard{transform:scale(1); opacity:1;}
+  .ytCard h3{margin:0 0 12px 0; font-size:0.95rem; letter-spacing:2px; color:#ffb9a8;}
+  .ytRow{display:flex; gap:8px; margin-bottom:12px;}
+  #ytInput{flex:1; border-radius:10px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.05);
+    color:#f6ece6; padding:10px 12px; font-size:0.9rem; outline:none; user-select:text; -webkit-user-select:text;}
+  #ytLoadBtn{padding:10px 16px; border-radius:10px; border:none; font-weight:700;
+    background:linear-gradient(180deg,#ff8a6a,#b8232f); color:#fff;}
+  #ytFrameWrap{position:relative; width:100%; padding-bottom:56.25%; background:#000; border-radius:10px; overflow:hidden;}
+  #ytFrameWrap iframe{position:absolute; inset:0; width:100%; height:100%; border:0;}
+  #ytEmpty{position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    color:#8d7b76; font-size:0.82rem; text-align:center; padding:20px;}
+  .ytActions{display:flex; gap:8px; margin-top:12px;}
+  .ytActions button{flex:1; padding:10px; border-radius:10px; border:1px solid rgba(255,255,255,0.15);
+    background:rgba(255,255,255,0.06); color:#f6ece6; font-size:0.82rem;}
+  #ytNote{font-size:0.7rem; color:#8d7b76; margin-top:10px; line-height:1.4;}
 </style>
 </head>
 <body>
@@ -126,6 +165,25 @@
   <div id="emojiBar"></div>
 
   <button id="chatToggleBtn">💬<span class="unread" id="unreadBadge">0</span></button>
+  <button id="ytBtn">▶</button>
+</div>
+
+<div id="ytPanel">
+  <div class="ytCard">
+    <h3>VER JUNTOS</h3>
+    <div class="ytRow">
+      <input type="text" id="ytInput" placeholder="pegá un link de YouTube...">
+      <button id="ytLoadBtn">Poner</button>
+    </div>
+    <div id="ytFrameWrap">
+      <div id="ytEmpty">Pegá un link de YouTube y tocá "Poner" para que lo vean los dos.</div>
+    </div>
+    <div class="ytActions">
+      <button id="ytSyncBtn">Re-sincronizar</button>
+      <button id="ytCloseBtn">Cerrar</button>
+    </div>
+    <div id="ytNote">El play, la pausa y el momento del video se sincronizan entre los dos. Si se llegan a desfasar, tocá "Re-sincronizar".</div>
+  </div>
 </div>
 
 <div id="chatPanel">
@@ -135,6 +193,13 @@
       <button id="chatCloseBtn">✕</button>
     </div>
     <div id="chatLog"></div>
+    <div id="replyBar">
+      <div class="info">
+        <div class="who" id="replyWho"></div>
+        <div class="txt" id="replyTxt"></div>
+      </div>
+      <button id="replyCancelBtn">✕</button>
+    </div>
     <div class="chatInputRow">
       <input type="text" id="chatInput" placeholder="escribí algo..." maxlength="200">
       <button id="chatSendBtn">➜</button>
@@ -145,6 +210,8 @@
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
+<!-- API de YouTube (para sincronizar play/pausa) -->
+<script src="https://www.youtube.com/iframe_api"></script>
 
 <script>
 (function(){
@@ -465,6 +532,8 @@ function attachRoomListeners(){
       }
     }
   });
+
+  attachVideoListener();
 }
 
 /* ============================================================
@@ -510,13 +579,43 @@ function updateUnreadBadge(){
   else badge.classList.remove("show");
 }
 
+let replyingTo = null;
+
 function appendChatLog(msg){
   const div = document.createElement("div");
   div.className = "chatMsg " + (msg.from===myId ? "mine" : "theirs");
-  div.textContent = msg.text;
+
+  if(msg.replyTo && msg.replyTo.text){
+    const quote = document.createElement("span");
+    quote.className = "replyQuote";
+    const who = msg.replyTo.from===myId ? "Vos" : (NAMES[msg.replyTo.from]||"");
+    quote.textContent = who + ": " + msg.replyTo.text;
+    div.appendChild(quote);
+  }
+
+  const body = document.createElement("span");
+  body.textContent = msg.text;
+  div.appendChild(body);
+
+  div.addEventListener("click", ()=> startReply(msg));
+
   chatLog.appendChild(div);
   chatLog.scrollTop = chatLog.scrollHeight;
 }
+
+function startReply(msg){
+  replyingTo = { from: msg.from, text: msg.text.slice(0,120) };
+  document.getElementById("replyWho").textContent =
+    "Respondiendo a " + (msg.from===myId ? "vos mismo" : (NAMES[msg.from]||""));
+  document.getElementById("replyTxt").textContent = msg.text;
+  document.getElementById("replyBar").classList.add("show");
+  chatInput.focus();
+}
+function cancelReply(){
+  replyingTo = null;
+  document.getElementById("replyBar").classList.remove("show");
+}
+document.getElementById("replyCancelBtn").addEventListener("click", cancelReply);
 
 const chatSendBtn = document.getElementById("chatSendBtn");
 const chatStatus = document.createElement("div");
@@ -535,9 +634,12 @@ function sendChat(){
     return;
   }
   chatSendBtn.disabled = true;
-  db.ref("room/chat").push({ from: myId, text: text, ts: Date.now() })
+  const payload = { from: myId, text: text, ts: Date.now() };
+  if(replyingTo) payload.replyTo = replyingTo;
+  db.ref("room/chat").push(payload)
     .then(()=>{
       chatInput.value = "";
+      cancelReply();
       chatStatus.style.display = "none";
       chatSendBtn.disabled = false;
     })
@@ -683,6 +785,179 @@ document.getElementById("btnFire").addEventListener("click", ()=> toggleSound("f
 updateSoundButtons();
 
 document.body.addEventListener("pointerdown", unlockAudio, { once:true });
+
+/* ============================================================
+   REPRODUCTOR DE YOUTUBE SINCRONIZADO
+   ============================================================ */
+const ytPanel = document.getElementById("ytPanel");
+const ytInput = document.getElementById("ytInput");
+const ytFrameWrap = document.getElementById("ytFrameWrap");
+const ytEmpty = document.getElementById("ytEmpty");
+
+let ytPlayer = null;
+let ytApiReady = false;
+let currentVideoId = null;
+let applyingRemote = false;   // evita reenviar cambios que vinieron del otro
+let lastRemoteState = null;
+const SYNC_TOLERANCE = 1.5;   // segundos de desfase que tolera antes de corregir
+
+window.onYouTubeIframeAPIReady = function(){
+  ytApiReady = true;
+};
+
+function extractVideoId(url){
+  if(!url) return null;
+  url = url.trim();
+  if(/^[a-zA-Z0-9_-]{11}$/.test(url)) return url;
+  let m = url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+  if(m) return m[1];
+  m = url.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+  if(m) return m[1];
+  m = url.match(/\/(?:embed|shorts|live)\/([a-zA-Z0-9_-]{11})/);
+  if(m) return m[1];
+  return null;
+}
+
+function ensurePlayerHost(){
+  let host = document.getElementById("ytPlayerHost");
+  if(!host){
+    ytFrameWrap.innerHTML = "";
+    host = document.createElement("div");
+    host.id = "ytPlayerHost";
+    host.style.cssText = "position:absolute; inset:0;";
+    ytFrameWrap.appendChild(host);
+  }
+  return host;
+}
+
+function renderVideo(videoId, startAt, shouldPlay){
+  if(!videoId){
+    ytFrameWrap.innerHTML = "";
+    ytFrameWrap.appendChild(ytEmpty);
+    ytEmpty.style.display = "flex";
+    currentVideoId = null;
+    ytPlayer = null;
+    return;
+  }
+  if(!ytApiReady){
+    ytEmpty.textContent = "Cargando el reproductor...";
+    ytEmpty.style.display = "flex";
+    setTimeout(()=> renderVideo(videoId, startAt, shouldPlay), 400);
+    return;
+  }
+
+  const sameVideo = (currentVideoId === videoId);
+  currentVideoId = videoId;
+
+  if(ytPlayer && sameVideo && typeof ytPlayer.seekTo === "function"){
+    applyRemoteState(startAt, shouldPlay);
+    return;
+  }
+
+  ensurePlayerHost();
+  if(ytPlayer && typeof ytPlayer.destroy === "function"){
+    try{ ytPlayer.destroy(); }catch(e){}
+    ytPlayer = null;
+    ensurePlayerHost();
+  }
+
+  ytPlayer = new YT.Player("ytPlayerHost", {
+    videoId: videoId,
+    playerVars: { playsinline:1, rel:0, modestbranding:1 },
+    events: {
+      onReady: ()=>{
+        if(typeof startAt === "number") {
+          try{ ytPlayer.seekTo(startAt, true); }catch(e){}
+        }
+        if(shouldPlay){
+          applyingRemote = true;
+          try{ ytPlayer.playVideo(); }catch(e){}
+          setTimeout(()=>{ applyingRemote = false; }, 600);
+        }
+      },
+      onStateChange: onLocalStateChange
+    }
+  });
+}
+
+function onLocalStateChange(e){
+  if(applyingRemote || !db || !myId) return;
+  let time = 0;
+  try{ time = ytPlayer.getCurrentTime() || 0; }catch(err){}
+
+  if(e.data === YT.PlayerState.PLAYING){
+    db.ref("room/video").update({ playing:true, time:time, by:myId, ts:Date.now() });
+  } else if(e.data === YT.PlayerState.PAUSED){
+    db.ref("room/video").update({ playing:false, time:time, by:myId, ts:Date.now() });
+  }
+}
+
+function applyRemoteState(time, playing){
+  if(!ytPlayer || typeof ytPlayer.getCurrentTime !== "function") return;
+  applyingRemote = true;
+  try{
+    const local = ytPlayer.getCurrentTime() || 0;
+    if(typeof time === "number" && Math.abs(local - time) > SYNC_TOLERANCE){
+      ytPlayer.seekTo(time, true);
+    }
+    const state = ytPlayer.getPlayerState();
+    if(playing && state !== YT.PlayerState.PLAYING){
+      ytPlayer.playVideo();
+    } else if(!playing && state === YT.PlayerState.PLAYING){
+      ytPlayer.pauseVideo();
+    }
+  }catch(e){}
+  setTimeout(()=>{ applyingRemote = false; }, 700);
+}
+
+document.getElementById("ytBtn").addEventListener("click", ()=>{
+  ytPanel.classList.add("open");
+});
+document.getElementById("ytCloseBtn").addEventListener("click", ()=>{
+  ytPanel.classList.remove("open");
+});
+ytPanel.addEventListener("click",(e)=>{ if(e.target===ytPanel) ytPanel.classList.remove("open"); });
+
+document.getElementById("ytLoadBtn").addEventListener("click", ()=>{
+  const id = extractVideoId(ytInput.value);
+  if(!id){
+    ytEmpty.textContent = "Ese link no parece de YouTube. Probá copiarlo de nuevo.";
+    ytEmpty.style.display = "flex";
+    return;
+  }
+  renderVideo(id, 0, false);
+  if(db) db.ref("room/video").set({ id:id, time:0, playing:false, by:myId, ts:Date.now() });
+});
+
+document.getElementById("ytSyncBtn").addEventListener("click", ()=>{
+  if(!db) return;
+  db.ref("room/video").once("value").then((snap)=>{
+    const v = snap.val();
+    if(v && v.id){
+      let t = v.time || 0;
+      if(v.playing && v.ts) t += (Date.now() - v.ts)/1000; // compensar el tiempo transcurrido
+      renderVideo(v.id, t, !!v.playing);
+    }
+  }).catch(()=>{});
+});
+
+function attachVideoListener(){
+  if(!db) return;
+  db.ref("room/video").on("value",(snap)=>{
+    const v = snap.val();
+    if(!v || !v.id) return;
+    if(v.by === myId) return; // ignorar lo que mandé yo
+
+    let t = v.time || 0;
+    if(v.playing && v.ts) t += (Date.now() - v.ts)/1000;
+
+    if(v.id !== currentVideoId){
+      renderVideo(v.id, t, !!v.playing);
+    } else {
+      applyRemoteState(t, !!v.playing);
+    }
+  });
+}
 
 })();
 </script>
